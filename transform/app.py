@@ -1,6 +1,7 @@
 from flask import Flask
 from flask import request, current_app, make_response, send_file
 from werkzeug.utils import secure_filename
+from flask_cors import CORS
 from os import path, getenv, makedirs
 from shutil import move
 from tempfile import gettempdir
@@ -14,6 +15,7 @@ import zipfile
 import tarfile
 from . import db
 from .gdal_transform import gdal_transform
+import json
 
 def mkdir(path):
     """Creates recursively the path, ignoring warnings for existing directories."""
@@ -69,6 +71,13 @@ db.init_app(app)
 executor = Executor(app)
 executor.add_default_done_callback(executorCallback)
 
+#Enable CORS
+if getenv('CORS') is not None:
+    if getenv('CORS')[0:1] == '[':
+        origins = json.loads(getenv('CORS'))
+    else:
+        origins = getenv('CORS')
+    cors = CORS(app, origins=origins)
 @executor.job
 def enqueue(ticket, src_path, tgt_path, gdal_params):
     """Enqueue a transform job (in case requested response type is 'deferred')."""
