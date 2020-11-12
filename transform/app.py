@@ -11,6 +11,8 @@ import pyproj
 from osgeo import ogr, gdal
 from datetime import datetime, timezone
 from flask_executor import Executor
+from apispec import APISpec
+from apispec_webframeworks.flask import FlaskPlugin
 import zipfile
 import tarfile
 from . import db
@@ -59,6 +61,19 @@ def transformProcess(src_file, tgt_path, gdal_params):
 
 if getenv('OUTPUT_DIR') is None:
     raise Exception('Environment variable OUTPUT_DIR is not set.')
+
+spec = APISpec(
+    title="Transform API",
+    version="0.0.1",
+    info=dict(
+        description="A simple service to transform a spatial (vector or raster) file. Transformation includes reprojection into another spatial reference system (and resampling in case of raster reprojection) and/or change of the file format (e.g. Shapefile into CSV).",
+        contact={"email": "pmitropoulos@getmap.gr"}
+    ),
+    externalDocs={"description": "GitHub", "url": "https://github.com/OpertusMundi/transform"},
+    openapi_version="3.0.2",
+    plugins=[FlaskPlugin()],
+)
+
 app = Flask(__name__, instance_relative_config=True)
 app.config.from_mapping(
     SECRET_KEY='dev',
@@ -78,6 +93,7 @@ if getenv('CORS') is not None:
     else:
         origins = getenv('CORS')
     cors = CORS(app, origins=origins)
+
 @executor.job
 def enqueue(ticket, src_path, tgt_path, gdal_params):
     """Enqueue a transform job (in case requested response type is 'deferred')."""
@@ -148,37 +164,126 @@ def getTransformParams(request):
 @app.route("/")
 def index():
     """The index route, gives info about the API endpoints."""
-    current_app.logger.info("transform: params=%s headers=%s environ=%s", \
-        dict(request.values), dict(request.headers), dict(request.environ))
-    transform_params = {"from": "<CRS>", "to": "<CRS>", "format": "<FORMAT>", "src_type": "<raster|vector>", "format": "<GDAL Driver>", "response": "<prompt|deferred>"}
-    get = {
-        "/transform": {"params": {**transform_params, "path": "<source file path>"}, "response": "json"},
-        "/status/<ticket>": {"response": "json"},
-        "/resource/<ticket>": {"response": "stream"}
-    }
-    post = {"/transform": {"params": transform_params, "body": {"resource": "stream"}, "response": "json|stream"}}
-    response = make_response({"GET": get, "POST": post}, 200)
-    return response
+    return make_response(spec.to_dict(), 200)
 
 @app.route("/transform", methods=["POST"])
 def transform():
-    """The transformation endpoint.
-
-    It expects the following HTTP form parameters:
-        -from: The CRS of the source file (otherwise, CRS will be determined).
-        -to: The CRS in which the file will be translated.
-        -src_type*: vector or raster.
-        -format: The expected format of the returned file.
-        -response: prompt (default) or deferred.
-        -resource*: A resovable path of source file or the source file itself.
-        * Required
-
-    In case the source file is uploaded in the body of the request (resource), the resulting
-    file is returned as a stream, otherwise (the case resource represents a resolvable path)
-    the response contains a path of the resulted file.
-    However, one could determine by adjusting the value of 'response' whether initiates promptly
-    the process of transformation and waits for the result ('prompt') or initiates a background
-    process and gets a ticket instead ('deferred').
+    """Transform a vector or raster file
+    ---
+    post:
+      summary: Transform a vector or raster file
+      tags:
+        - Transform
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                resource:
+                  type: string
+                  format: binary
+                  description: The spatial file.
+                src_type:
+                  type: string
+                  enum: [vector, raster]
+                  description: The type of the spatial file (*vector* or *raster*).
+                from:
+                  type: string
+                  description: The spatial file native CRS. If not given, it will be extracted from the data.
+                to:
+                  type: string
+                  description: The CRS that the spatial file will be projected into. If not given, no reprojection will take place.
+                format:
+                  type: string
+                  description: The expected format of the resulting file in the form of GDAL drivers short names. (See GDAL documentation for [vectors](https://gdal.org/drivers/vector/index.html) and [rasters](https://gdal.org/drivers/raster/index.html).) If not given, the source file format will be used.
+                response:
+                  type: string
+                  enum: [prompt, deferred]
+                  default: prompt
+                  description: Determines whether the transform proccess should be promptly initiated (*prompt*) or queued (*deferred*). In the first case, the response waits for the result, in the second the response is immediate returning a ticket corresponding to the request.
+              required:
+                - resource
+                - src_type
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                resource:
+                  type: string
+                  description: The spatial file resolvable path.
+                src_type:
+                  type: string
+                  enum: [vector, raster]
+                  description: The type of the spatial file (*vector* or *raster*).
+                from:
+                  type: string
+                  description: The spatial file native CRS. If not given, it will be extracted from the data.
+                to:
+                  type: string
+                  description: The CRS that the spatial file will be projected into. If not given, no reprojection will take place.
+                format:
+                  type: string
+                  description: The expected format of the resulting file in the form of GDAL drivers short names. (See GDAL documentation for [vectors](https://gdal.org/drivers/vector/index.html) and [rasters](https://gdal.org/drivers/raster/index.html).) If not given, the source file format will be used.
+                response:
+                  type: string
+                  enum: [prompt, deferred]
+                  default: prompt
+                  description: Determines whether the transform proccess should be promptly initiated (*prompt*) or queued (*deferred*). In the first case, the response waits for the result, in the second the response is immediate returning a ticket corresponding to the request.
+              required:
+                - resource
+                - src_type
+      responses:
+        200:
+          description: Transform completed and returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  filepath:
+                    type: string
+                    description: The resulting file path
+            application/x-tar:
+              schema:
+                type: string
+                format: binary
+        202:
+          description: Accepted for processing, but transform has not been completed.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  -
+                    type: object
+                    properties:
+                      ticket:
+                        type: string
+                        description: The ticket corresponding to the request.
+                      endpoint:
+                        type: string
+                        description: The *resource* endpoint to get the resulting resource when ready.
+                      status:
+                        type: string
+                        description: The *status* endpoint to poll for the status of the request.
+                  -
+                    type: object
+                    properties:
+                      ticket:
+                        type: string
+                        description: The ticket corresponding to the request.
+                      filepath:
+                        type: string
+                        description: The *resource* endpoint to get the resultin resource when ready.
+          links:
+            GetStatus:
+              operationId: getStatus
+              parameters:
+                ticket: '$response.body#/ticket'
+              description: The `ticket` value returned in the response can be used as the `ticket` parameter in `GET /status/{ticket}`.
+        400:
+          description: Client error.
     """
     # Create tmp directory used for storage of uploaded
     # (and created, in case of prompt response) files.
@@ -234,11 +339,52 @@ def transform():
             response = { "ticket": ticket, "filepath": path.join(rel_path, ticket + '.tar.gz') }
         else:
             response = { "ticket": ticket, "endpoint": "/resource/%s" % (ticket), "status": "/status/%s" % (ticket)}
-        return make_response(response, 200)
+        return make_response(response, 202)
 
 @app.route("/status/<ticket>")
 def status(ticket):
-    """Get the status of a specific ticket."""
+    """Get the status of a specific ticket.
+    ---
+    get:
+      summary: Get the status of a transform request.
+      operationId: getStatus
+      description: Returns the status of a request corresponding to a specific ticket.
+      tags:
+        - Status
+      parameters:
+        - name: ticket
+          in: path
+          description: The ticket of the request
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Ticket found and status returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  completed:
+                    type: boolean
+                    description: Whether transformation process has been completed or not.
+                  success:
+                    type: boolean
+                    description: Whether transformation process completed succesfully.
+                  comment:
+                    type: string
+                    description: If transformation has failed, a short comment describing the reason.
+                  requested:
+                    type: string
+                    format: datetime
+                    description: The timestamp of the request.
+                  execution_time(s):
+                    type: integer
+                    description: The execution time in seconds.
+        404:
+          description: Ticket not found.
+    """
     if ticket is None:
         return make_response('Ticket is missing.', 400)
     dbc = db.get_db()
@@ -253,7 +399,33 @@ def status(ticket):
 
 @app.route("/resource/<ticket>")
 def resource(ticket):
-    """Get the resulted resource associated with a specific ticket."""
+    """Get the resulted resource associated with a specific ticket.
+    ---
+    get:
+      summary: Get the resource associated to a transform request.
+      description: Returns the resource resulted from a transform request corresponding to a specific ticket.
+      tags:
+        - Resource
+      parameters:
+        - name: ticket
+          in: path
+          description: The ticket of the request
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: The transformed compressed spatial file.
+          content:
+            application/x-tar:
+              schema:
+                type: string
+                format: binary
+        404:
+          description: Ticket not found or transform has not been completed.
+        507:
+          description: Resource does not exist.
+    """
     if ticket is None:
         return make_response('Resource ticket is missing.', 400)
     dbc = db.get_db()
@@ -264,3 +436,8 @@ def resource(ticket):
     if not path.isfile(file):
         return make_response('Resource does not exist.', 507)
     return send_file(file, as_attachment=True)
+
+with app.test_request_context():
+    spec.path(view=transform)
+    spec.path(view=status)
+    spec.path(view=resource)

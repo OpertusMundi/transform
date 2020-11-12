@@ -14,6 +14,8 @@ setuptools.setup(
         'pyproj>=2.6.0,<2.7.0',
         'Flask>=1.1.2,<1.1.3',
         'flask-executor>=0.9.3,<0.9.4',
+        'apispec>=4.0.0,<4.1.0',
+        'apispec-webframeworks>=0.5.2,<0.5.3',
         'flask-cors>=3.0.9,<3.1.0'
     ],
     python_requires='>=3.7',
