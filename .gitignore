@@ -1,5 +1,3 @@
 __pycache__/
 instance/
-Dockerfile
-wsgi.py
 set_env_vars.sh
