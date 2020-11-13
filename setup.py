@@ -18,6 +18,7 @@ setuptools.setup(
         'apispec-webframeworks>=0.5.2,<0.5.3',
         'flask-cors>=3.0.9,<3.1.0'
     ],
+    package_data={'transform': ['logging.conf']},
     python_requires='>=3.7',
     zip_safe=False,
 )
