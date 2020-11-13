@@ -16,7 +16,6 @@ class ContextFilter(Filter):
                     setattr(record, attr, value)
                 else:
                     setattr(record, attr, '-')
-                print('%s: %s' % (attr, getattr(record, attr)))
             else:
                 setattr(record, attr, None)
         return True
