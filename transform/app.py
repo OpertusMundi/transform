@@ -2,7 +2,7 @@ from flask import Flask
 from flask import request, current_app, make_response, send_file
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
-from os import path, getenv, makedirs
+from os import path, getenv, makedirs, stat
 from shutil import move
 from tempfile import gettempdir
 from uuid import uuid4
@@ -17,6 +17,7 @@ import zipfile
 import tarfile
 from . import db
 from .gdal_transform import gdal_transform
+from .logging import getLoggers
 import json
 
 def mkdir(path):
@@ -39,10 +40,13 @@ def executorCallback(future):
         filepath = None
     with app.app_context():
         dbc = db.get_db()
-        time = dbc.execute('SELECT requested_time FROM tickets WHERE ticket = ?;', [ticket]).fetchone()['requested_time']
+        db_result = dbc.execute('SELECT requested_time, filesize FROM tickets WHERE ticket = ?;', [ticket]).fetchone()
+        time = db_result['requested_time']
+        filesize = db_result['filesize']
         execution_time = round((datetime.now(timezone.utc) - time.replace(tzinfo=timezone.utc)).total_seconds(), 3)
         dbc.execute('UPDATE tickets SET result=?, success=?, status=1, execution_time=?, comment=? WHERE ticket=?;', [filepath, success, execution_time, comment, ticket])
         dbc.commit()
+        accountLogger(ticket=ticket, success=success, execution_start=time, execution_time=execution_time, comment=comment, filesize=filesize)
 
 def transformProcess(src_file, tgt_path, gdal_params):
     """Checks whether the file is compressed and call gdal_transform."""
@@ -62,6 +66,10 @@ def transformProcess(src_file, tgt_path, gdal_params):
 if getenv('OUTPUT_DIR') is None:
     raise Exception('Environment variable OUTPUT_DIR is not set.')
 
+#Logging
+mainLogger, accountLogger = getLoggers()
+
+# OpenAPI documentation
 spec = APISpec(
     title="Transform API",
     version="0.0.1",
@@ -74,6 +82,7 @@ spec = APISpec(
     plugins=[FlaskPlugin()],
 )
 
+# Initialize app
 app = Flask(__name__, instance_relative_config=True)
 app.config.from_mapping(
     SECRET_KEY='dev',
@@ -97,8 +106,9 @@ if getenv('CORS') is not None:
 @executor.job
 def enqueue(ticket, src_path, tgt_path, gdal_params):
     """Enqueue a transform job (in case requested response type is 'deferred')."""
+    filesize = stat(src_path).st_size
     dbc = db.get_db()
-    dbc.execute('INSERT INTO tickets (ticket) VALUES(?);', [ticket])
+    dbc.execute('INSERT INTO tickets (ticket, filesize) VALUES(?, ?);', [ticket, filesize])
     dbc.commit()
     try:
         result = transformProcess(src_path, tgt_path, gdal_params)
@@ -294,7 +304,7 @@ def transform():
     try:
         params = getTransformParams(request)
     except Exception as e:
-        current_app.logger.error(e)
+        mainLogger.info('Client error: %s', str(e))
         return make_response({'Error': str(e)}, 400)
 
     # Create a unique ticket for the request
@@ -322,10 +332,16 @@ def transform():
     tgt_path = path.join(tempdir, ticket)
     mkdir(tgt_path)
     if params['response'] == 'prompt':
+        filesize = stat(src_file).st_size
+        start_time = datetime.now()
         try:
             result = transformProcess(src_file, tgt_path, gdal_params)
         except Exception as e:
+            execution_time = round((datetime.now() - start_time).total_seconds(), 3)
+            accountLogger(success=False, execution_start=start_time, execution_time=execution_time, comment=str(e), filesize=filesize)
             return make_response(str(e), 400)
+        execution_time = round((datetime.now() - start_time).total_seconds(), 3)
+        accountLogger(success=True, execution_start=start_time, execution_time=execution_time, filesize=filesize)
         if params['resource'] is not None:
             mkdir(path.join(getenv('OUTPUT_DIR'), rel_path))
             rel_path = path.join(rel_path, path.basename(result))

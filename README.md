@@ -18,6 +18,7 @@ The following environment variables should be set:
 - **OUTPUT_DIR**: The location (full path), which will be used to store the resulting files (for the case of *deferred* request, see below).
 - (optional) **TEMPDIR**: The location of storing temporary files. If not set, the system temporary path location will be used.
 - (optional) **CORS**: List or string of allowed origins. Default: \*.
+- (optional) **LOGGING**: Logging configuration file, otherwise the default logging configuration file will be used.
 
 A development server could be started with:
 ```

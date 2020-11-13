@@ -8,6 +8,7 @@ CREATE TABLE tickets (
   execution_time REAL,
   requested_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   result text,
+  filesize INTEGER,
   comment text
 );
 
