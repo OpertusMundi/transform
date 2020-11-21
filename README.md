@@ -31,7 +31,7 @@ The main endpoint */transform* is accessible via a **POST** request and expects 
 - **from**: The spatial file native CRS. If not given, it will be extracted from the data.
 - **to**: The CRS that the spatial file will be projected into. If not given, no reprojection will take place.
 - **format**: The expected format of the resulting file in the form of GDAL short drivers name. (See GDAL documentation [for vectors](https://gdal.org/drivers/vector/index.html) and [for rasters](https://gdal.org/drivers/raster/index.html).) If not given, the source file format will be used.
-- **response**: *Prompt* (default) or *deferred* (see below).
+- **response**: *prompt* (default) or *deferred* (see below).
 
 The source file is contained in the *resource* field of the request. There are two possible ways to pass the source file to the service:
 1. The *resource* has a string value representing the resolvable path of the spatial file. In this case the resulting file is again determined by its path indicated in the response.

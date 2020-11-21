@@ -3,3 +3,9 @@ instance/
 set_env_vars.sh
 accounting.log
 *.pyc
+*.egg-info
+build/
+dist/
+certs/
+data/
+output/
