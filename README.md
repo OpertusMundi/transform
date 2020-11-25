@@ -1,9 +1,11 @@
 # Transform micro-service
 
 ## Description
+
 The purpose of this package is to deploy a micro-service which transforms a spatial (vector or raster) file. Transformation includes reprojection into another spatial reference system (and resampling in case of raster reprojection) and/or change of the file format (e.g. shapefile into csv). The service is built on *flask* and *sqlite* and GDAL is used for transformation.
 
 ## Installation
+
 The package requires at least Python 3.7, *GDAL 3.1.* and *sqlite3*. To install with **pip**:
 ```
 pip install git+https://github.com/OpertusMundi/transform.git
@@ -25,6 +27,7 @@ A development server could be started with:
 flask run
 ```
 ## Usage
+
 The main endpoint */transform* is accessible via a **POST** request and expects the following parameters:
 - **src_type** (required): *Vector* (default) or *raster*.
 - **resource** (required): A string representing the spatial file resolvable path **or** a stream containing the spatial file.
@@ -41,9 +44,10 @@ In each case, the requester could determine whether the service should promptly 
 
 Once deployed, info about the endpoints and their possible HTTP parameters could be obtained by requesting the index of the service, i.e. for development environment http://localhost:5000.
 
-## Run as a container
+## Build and run as a container
 
-Copy `.env.example` to `.env` and configure if needed. 
+Copy `.env.example` to `.env` and configure if needed (e.g `FLASK_ENV` variable).
+
 Copy `docker-compose.yml.example` to `docker-compose.yml` and adjust to your needs (e.g. volume locations etc.).
 
 Build:
@@ -51,6 +55,7 @@ Build:
     docker-compose build
 
 Prepare a `./data` directory to keep:
+
     * `./data/transform.sqlite`:  the SQLite database (an empty database, if running for first time)
     * `./data/secret_key`: file needed for signing/encrypting session data
     * `./logs`: a directory to keep logs under
