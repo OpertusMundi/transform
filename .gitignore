@@ -9,3 +9,6 @@ dist/
 certs/
 data/
 output/
+logs/
+.env
+docker-compose.yml

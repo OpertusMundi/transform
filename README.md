@@ -18,7 +18,7 @@ The following environment variables should be set:
 - **OUTPUT_DIR**: The location (full path), which will be used to store the resulting files (for the case of *deferred* request, see below).
 - (optional) **TEMPDIR**: The location of storing temporary files. If not set, the system temporary path location will be used.
 - (optional) **CORS**: List or string of allowed origins. Default: \*.
-- (optional) **LOGGING**: Logging configuration file, otherwise the default logging configuration file will be used.
+- (optional) **LOGGING_FILE_CONFIG**: Logging configuration file, otherwise the default logging configuration file will be used.
 
 A development server could be started with:
 ```
@@ -40,3 +40,25 @@ The source file is contained in the *resource* field of the request. There are t
 In each case, the requester could determine whether the service should promptly initiate the transformation process and wait to finish in order to return the response (**prompt** response) or should response immediately returning a ticket with the request (**deferred** response). In latter case, one could request */status/\<ticket\>* and */resource/\<ticket\>* in order to get the status and the resulting file corresponding to a specific ticket.
 
 Once deployed, info about the endpoints and their possible HTTP parameters could be obtained by requesting the index of the service, i.e. for development environment http://localhost:5000.
+
+## Run as a container
+
+Copy `.env.example` to `.env` and configure if needed. 
+Copy `docker-compose.yml.example` to `docker-compose.yml` and adjust to your needs (e.g. volume locations etc.).
+
+Build:
+
+    docker-compose build
+
+Prepare a `./data` directory to keep:
+    * `./data/transform.sqlite`:  the SQLite database (an empty database, if running for first time)
+    * `./data/secret_key`: file needed for signing/encrypting session data
+    * `./logs`: a directory to keep logs under
+    * `./output`: a directory to be used as root of a hierarchy of output files
+
+Start service:
+    
+    docker-compose up
+
+
+

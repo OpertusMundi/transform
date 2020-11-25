@@ -3,4 +3,7 @@ dist
 certs
 data
 output
+logs
 README.md
+.env
+docker-compose.yml*

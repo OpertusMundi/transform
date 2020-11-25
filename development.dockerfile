@@ -22,7 +22,7 @@ RUN chmod +x /usr/local/bin/wsgi.py /usr/local/bin/docker-command.sh
 
 EXPOSE 5000
 
-ENV FLASK_APP="transform" FLASK_ENV="production" FLASK_DEBUG="false"
+ENV FLASK_ENV="production" FLASK_DEBUG="false"
 ENV OUTPUT_DIR="/usr/local/transform/output/"
 ENV TLS_CERTIFICATE="" TLS_KEY=""
 
