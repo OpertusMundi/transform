@@ -1,7 +1,6 @@
 __pycache__/
 instance/
 set_env_vars.sh
-accounting.log
 *.pyc
 *.egg-info
 build/
@@ -10,5 +9,8 @@ certs/
 data/
 output/
 logs/
+*.log
 .env
 docker-compose.yml
+compose.yml
+compose-testing.yml

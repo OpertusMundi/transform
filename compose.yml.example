@@ -28,7 +28,7 @@ services:
       target: '/var/local/transform/output'
        
     networks:
-    - 'opertusmundi_dev_network'  
+    - 'opertusmundi_network'  
 
     ports:
     - '5000:5000'
@@ -39,6 +39,6 @@ services:
       FLASK_DEBUG: "${FLASK_DEBUG}"
 
 networks:
-  opertusmundi_dev_network: 
+  opertusmundi_network: 
     external: true
 

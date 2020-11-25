@@ -1,5 +1,7 @@
 # Transform micro-service
 
+[![Build Status](https://ci.dev-1.opertusmundi.eu:9443/api/badges/OpertusMundi/transform/status.svg?ref=refs/heads/master)](https://ci.dev-1.opertusmundi.eu:9443/OpertusMundi/transform)
+
 ## Description
 
 The purpose of this package is to deploy a micro-service which transforms a spatial (vector or raster) file. Transformation includes reprojection into another spatial reference system (and resampling in case of raster reprojection) and/or change of the file format (e.g. shapefile into csv). The service is built on *flask* and *sqlite* and GDAL is used for transformation.
@@ -48,11 +50,11 @@ Once deployed, info about the endpoints and their possible HTTP parameters could
 
 Copy `.env.example` to `.env` and configure if needed (e.g `FLASK_ENV` variable).
 
-Copy `docker-compose.yml.example` to `docker-compose.yml` and adjust to your needs (e.g. volume locations etc.).
+Copy `compose.yml.example` to `compose.yml` (or `docker-compose.yml`) and adjust to your needs (e.g. specify volume source locations etc.).
 
 Build:
 
-    docker-compose build
+    docker-compose -f compose.yml build
 
 Prepare the following files/directories:
 
@@ -61,9 +63,16 @@ Prepare the following files/directories:
    * `./logs`: a directory to keep logs under
    * `./output`: a directory to be used as root of a hierarchy of output files
 
-Start service:
+Start application:
     
-    docker-compose up
+    docker-compose -f compose.yml up
 
 
+## Run tests
+
+Copy `compose-testing.yml.example` to `compose-testing.yml` and adjust to your needs. This is a just a docker-compose recipe for setting up the testing container.
+
+Run nosetests (in an ephemeral container):
+
+    docker-compose -f compose-testing.yml run --rm --user "$(id -u):$(id -g)" nosetests -v
 
