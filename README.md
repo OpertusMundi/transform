@@ -56,10 +56,10 @@ Build:
 
 Prepare a `./data` directory to keep:
 
-    * `./data/transform.sqlite`:  the SQLite database (an empty database, if running for first time)
-    * `./data/secret_key`: file needed for signing/encrypting session data
-    * `./logs`: a directory to keep logs under
-    * `./output`: a directory to be used as root of a hierarchy of output files
+   * `./data/transform.sqlite`:  the SQLite database (an empty database, if running for first time)
+   * `./data/secret_key`: file needed for signing/encrypting session data
+   * `./logs`: a directory to keep logs under
+   * `./output`: a directory to be used as root of a hierarchy of output files
 
 Start service:
     
