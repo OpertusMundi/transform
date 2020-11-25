@@ -54,7 +54,7 @@ Build:
 
     docker-compose build
 
-Prepare a `./data` directory to keep:
+Prepare the following files/directories:
 
    * `./data/transform.sqlite`:  the SQLite database (an empty database, if running for first time)
    * `./data/secret_key`: file needed for signing/encrypting session data
