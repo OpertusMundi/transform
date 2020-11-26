@@ -6,7 +6,7 @@ services:
 
   transform:
     
-    image: "local/opertusmundi-transform:${VERSION}"
+    image: "opertusmundi/transform:${VERSION}"
     build:
       context: .
       args:

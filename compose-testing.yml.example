@@ -7,7 +7,7 @@ services:
   # note: this is not actually a service, we intend to run it only `docker-compose run`
   nosetests:
 
-    image: "local/opertusmundi-transform:${VERSION}-testing"
+    image: "opertusmundi/transform:${VERSION}-testing"
     build:
       context: .
       dockerfile: testing.dockerfile
