@@ -72,7 +72,7 @@ mainLogger, accountLogger = getLoggers()
 # OpenAPI documentation
 spec = APISpec(
     title="Transform API",
-    version="0.0.1",
+    version=getenv('VERSION'),
     info=dict(
         description="A simple service to transform a spatial (vector or raster) file. Transformation includes reprojection into another spatial reference system (and resampling in case of raster reprojection) and/or change of the file format (e.g. Shapefile into CSV).",
         contact={"email": "pmitropoulos@getmap.gr"}
@@ -85,8 +85,8 @@ spec = APISpec(
 # Initialize app
 app = Flask(__name__, instance_relative_config=True)
 app.config.from_mapping(
-    SECRET_KEY='dev',
-    DATABASE=path.join(app.instance_path, 'transform.sqlite'),
+    SECRET_KEY=getenv('SECRET_KEY'),
+    DATABASE=getenv('DATABASE'),
 )
 
 # Ensure the instance folder exists and initialize application, db and executor.
@@ -174,6 +174,7 @@ def getTransformParams(request):
 @app.route("/")
 def index():
     """The index route, gives info about the API endpoints."""
+    mainLogger.info('Generating OpenAPI document...')
     return make_response(spec.to_dict(), 200)
 
 @app.route("/transform", methods=["POST"])
