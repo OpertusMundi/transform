@@ -69,7 +69,7 @@ def transformProcess(src_file, working_path, ticket, gdal_params):
             src_file = src_path
     return gdal_transform(src_file, tgt_path, **gdal_params)
 
-if getenv('OUTPUT_DIR') is None or not path.isdir(getenv('OUTPUT_DIR')):
+if getenv('OUTPUT_DIR') is None:
     raise Exception('Environment variable OUTPUT_DIR is not set.')
 
 #Logging
