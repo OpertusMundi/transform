@@ -88,7 +88,7 @@ spec = APISpec(
     plugins=[FlaskPlugin()],
 )
 
-app = Flask(__name__, instance_relative_config=True)
+app = Flask(__name__, instance_relative_config=True, instance_path=getenv('INSTANCE_PATH'))
 environment = getenv('FLASK_ENV')
 if environment == 'testing' or environment == 'development':
     secret_key = environment

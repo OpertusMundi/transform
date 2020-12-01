@@ -21,5 +21,11 @@ RUN pip3 install --upgrade pip
 COPY requirements.txt requirements-testing.txt ./
 RUN pip3 install --prefix=/usr/local -r requirements.txt -r requirements-testing.txt
 
-ENV FLASK_APP="transform" FLASK_ENV="testing" FLASK_DEBUG="false"
-ENV OUTPUT_DIR="./output" SECRET_KEY_FILE="./secret_key"
+ENV FLASK_APP="transform" \
+    FLASK_ENV="testing" \
+    FLASK_DEBUG="false" \
+    OUTPUT_DIR="./output"
+
+COPY run-nosetests.sh /
+RUN chmod a+x /run-nosetests.sh
+ENTRYPOINT ["/run-nosetests.sh"]

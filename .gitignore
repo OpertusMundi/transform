@@ -8,6 +8,7 @@ dist/
 certs/
 data/
 output/
+temp/
 logs/
 *.log
 .env
