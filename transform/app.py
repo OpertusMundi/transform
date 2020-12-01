@@ -89,7 +89,11 @@ spec = APISpec(
 )
 
 app = Flask(__name__, instance_relative_config=True)
-secret_key = getenv('SECRET_KEY') or open(getenv('SECRET_KEY_FILE')).read()
+environment = getenv('FLASK_ENV')
+if environment == 'testing' or environment == 'development':
+    secret_key = environment
+else:
+    secret_key = getenv('SECRET_KEY') or open(getenv('SECRET_KEY_FILE')).read()
 app.config.from_mapping(
     SECRET_KEY=secret_key,
     DATABASE=getenv('DATABASE'),
