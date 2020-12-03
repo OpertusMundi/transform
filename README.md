@@ -33,6 +33,8 @@ flask run
 
 ## Usage
 
+You can browse the full [OpenAPI documentation](https://opertusmundi.github.io/transform/)
+
 The main endpoint */transform* is accessible via a **POST** request and expects the following parameters:
 - **src_type** (required): *Vector* (default) or *raster*.
 - **resource** (required): A string representing the spatial file resolvable path **or** a stream containing the spatial file.
@@ -53,7 +55,11 @@ Once deployed, info about the endpoints and their possible HTTP parameters could
 
 Copy `.env.example` to `.env` and configure if needed (e.g `FLASK_ENV` variable).
 
-Copy `compose.yml.example` to `compose.yml` (or `docker-compose.yml`) and adjust to your needs (e.g. specify volume source locations etc.).
+Copy `compose.yml.example` to `compose.yml` (or `docker-compose.yml`) and adjust to your needs (e.g. specify volume source locations etc.). You will at least need to configure the network (inside `compose.yml`) to attach to. 
+
+For example, you can create a private network named `opertusmundi_network`:
+
+    docker network create --attachable opertusmundi_network
 
 Build:
 
