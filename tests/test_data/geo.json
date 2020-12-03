@@ -1,0 +1,35 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [48.1,0.25]
+      },
+      "properties": {
+        "Name": "First point"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [49.2,1.1]
+      },
+      "properties": {
+        "Name": "Second point"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [47.5,0.75]
+      },
+      "properties": {
+        "Name": "Third point"
+      }
+    }
+  ]
+}

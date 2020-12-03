@@ -37,6 +37,7 @@ services:
       OUTPUT_DIR: '/var/local/transform/output'
       FLASK_ENV: "${FLASK_ENV}"
       FLASK_DEBUG: "${FLASK_DEBUG}"
+      LOGGING_ROOT_LEVEL: 'INFO'
 
 networks:
   opertusmundi_network: 

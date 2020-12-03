@@ -14,13 +14,18 @@ services:
       args:
         VERSION: "${VERSION}"
     
-    entrypoint: ['nosetests']
-    command: ['--verbosity=2']
+    command: ['-v']
     volumes:
     - type: 'bind'
       source: .
       target: '/work'
     
+    environment:
+      TEMPDIR: '/work/temp'
+      OUTPUT_DIR: '/work/output'
+      INSTANCE_PATH: '/work/data'
+      DATABASE: '/work/data/transform-testing.sqlite'
+
     working_dir: /work
     user: "1000:1000"
     

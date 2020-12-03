@@ -16,18 +16,21 @@ Initialize sqlite database by running:
 ```
 flask init-db
 ```
+
 The following environment variables should be set:
-- **FLASK_ENV**: *development* or *production*.
-- **FLASK_APP**: *transform*
-- **OUTPUT_DIR**: The location (full path), which will be used to store the resulting files (for the case of *deferred* request, see below).
-- (optional) **TEMPDIR**: The location of storing temporary files. If not set, the system temporary path location will be used.
-- (optional) **CORS**: List or string of allowed origins. Default: \*.
-- (optional) **LOGGING_FILE_CONFIG**: Logging configuration file, otherwise the default logging configuration file will be used.
+- `FLASK_ENV`: `development` or `production`.
+- `FLASK_APP`: `transform` (if running in a container, this is automatically set)
+- `OUTPUT_DIR`: The location (full path), which will be used to store the resulting files (for the case of *deferred* request, see below).
+- (optional) `TEMPDIR`: The location of storing temporary files. If not set, the system temporary path location will be used.
+- (optional) `CORS`: List or string of allowed origins.
+- (optional) `LOGGING_FILE_CONFIG`: Logging configuration file, otherwise the default logging configuration file will be used.
+- (optional) `LOGGING_ROOT_LEVEL`: The level of detail for the root logger; one of `DEBUG`, 'INFO', `WARNING`.
 
 A development server could be started with:
 ```
 flask run
 ```
+
 ## Usage
 
 The main endpoint */transform* is accessible via a **POST** request and expects the following parameters:

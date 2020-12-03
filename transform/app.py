@@ -1,9 +1,9 @@
 from flask import Flask
-from flask import request, current_app, make_response, send_file
+from flask import request, current_app, make_response, send_file, session
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 from os import path, getenv, makedirs, stat
-from shutil import move
+from shutil import move, rmtree
 from tempfile import gettempdir
 from uuid import uuid4
 from hashlib import md5
@@ -29,29 +29,35 @@ def mkdir(path):
 
 def executorCallback(future):
     """The callback function called when a job has completed."""
-    ticket, result, success, comment = future.result()
+    ticket, result, success, comment, rel_path = future.result()
     if result is not None:
-        rel_path = datetime.now().strftime("%y%m%d")
         mkdir(path.join(getenv('OUTPUT_DIR'), rel_path))
         rel_path = path.join(rel_path, path.basename(result))
         filepath = path.join(getenv('OUTPUT_DIR'), rel_path)
         move(result, filepath)
     else:
         filepath = None
+    try:
+        tempdir = getenv('TEMPDIR') or gettempdir()
+        working_path = path.join(tempdir, __name__, ticket)
+        rmtree(working_path)
+    except Exception as e:
+        pass
     with app.app_context():
         dbc = db.get_db()
         db_result = dbc.execute('SELECT requested_time, filesize FROM tickets WHERE ticket = ?;', [ticket]).fetchone()
         time = db_result['requested_time']
         filesize = db_result['filesize']
         execution_time = round((datetime.now(timezone.utc) - time.replace(tzinfo=timezone.utc)).total_seconds(), 3)
-        dbc.execute('UPDATE tickets SET result=?, success=?, status=1, execution_time=?, comment=? WHERE ticket=?;', [filepath, success, execution_time, comment, ticket])
+        dbc.execute('UPDATE tickets SET result=?, success=?, status=1, execution_time=?, comment=? WHERE ticket=?;', [rel_path, success, execution_time, comment, ticket])
         dbc.commit()
         accountLogger(ticket=ticket, success=success, execution_start=time, execution_time=execution_time, comment=comment, filesize=filesize)
 
-def transformProcess(src_file, tgt_path, gdal_params):
+def transformProcess(src_file, working_path, ticket, gdal_params):
     """Checks whether the file is compressed and call gdal_transform."""
+    src_path = path.join(working_path, 'src')
+    tgt_path = path.join(working_path, 'results', ticket)
     if not path.isdir(src_file):
-        src_path = path.dirname(src_file)
         if tarfile.is_tarfile(src_file):
             handle = tarfile.open(src_file)
             handle.extractall(src_path)
@@ -82,10 +88,14 @@ spec = APISpec(
     plugins=[FlaskPlugin()],
 )
 
-# Initialize app
-app = Flask(__name__, instance_relative_config=True)
+app = Flask(__name__, instance_relative_config=True, instance_path=getenv('INSTANCE_PATH'))
+environment = getenv('FLASK_ENV')
+if environment == 'testing' or environment == 'development':
+    secret_key = environment
+else:
+    secret_key = getenv('SECRET_KEY') or open(getenv('SECRET_KEY_FILE')).read()
 app.config.from_mapping(
-    SECRET_KEY=getenv('SECRET_KEY'),
+    SECRET_KEY=secret_key,
     DATABASE=getenv('DATABASE'),
 )
 
@@ -104,17 +114,17 @@ if getenv('CORS') is not None:
     cors = CORS(app, origins=origins)
 
 @executor.job
-def enqueue(ticket, src_path, tgt_path, gdal_params):
+def enqueue(ticket, src_path, working_path, date, gdal_params):
     """Enqueue a transform job (in case requested response type is 'deferred')."""
     filesize = stat(src_path).st_size
     dbc = db.get_db()
     dbc.execute('INSERT INTO tickets (ticket, filesize) VALUES(?, ?);', [ticket, filesize])
     dbc.commit()
     try:
-        result = transformProcess(src_path, tgt_path, gdal_params)
+        result = transformProcess(src_path, working_path, ticket, gdal_params)
     except Exception as e:
-        return (ticket, None, 0, str(e))
-    return (ticket, result, 1, None)
+        return (ticket, None, 0, str(e), date)
+    return (ticket, result, 1, None, date)
 
 def getTransformParams(request):
     """Get and check the http request parameters for transformation."""
@@ -170,6 +180,36 @@ def getTransformParams(request):
     if len(errors) > 0:
         raise Exception(' / '.join(errors))
     return params
+
+@app.before_request
+def create_paths():
+    if request.endpoint == 'transform':
+        # Create tmp directory used for storage of uploaded
+        # (and created, in case of prompt response) files.
+        tempdir = getenv('TEMPDIR') or gettempdir()
+        tempdir = path.join(tempdir, __name__)
+        mkdir(tempdir)
+        # Create a unique ticket for the request
+        ticket = md5(str(uuid4()).encode()).hexdigest()
+        # Create the working path
+        working_path = path.join(tempdir, ticket)
+        results_path = path.join(working_path, 'results', ticket)
+        mkdir(results_path)
+        # Create the temp source path
+        src_path = path.join(working_path, 'src')
+        mkdir(src_path)
+        # Store to session
+        session['ticket'] = ticket
+        session['temp_working_path'] = working_path
+
+@app.teardown_request
+def clean_temp(error=None):
+    if 'response_type' in session and session['response_type'] == 'prompt':
+        try:
+            working_path = session['temp_working_path']
+            rmtree(working_path)
+        except Exception as e:
+            pass
 
 @app.route("/")
 def index():
@@ -256,6 +296,9 @@ def transform():
                   filepath:
                     type: string
                     description: The resulting file path
+                  type:
+                    type: string
+                    description: The response type as requested.
             application/x-tar:
               schema:
                 type: string
@@ -269,6 +312,9 @@ def transform():
                   -
                     type: object
                     properties:
+                      type:
+                        type: string
+                        description: The response type as requested.
                       ticket:
                         type: string
                         description: The ticket corresponding to the request.
@@ -281,6 +327,9 @@ def transform():
                   -
                     type: object
                     properties:
+                      type:
+                        type: string
+                        description: The response type as requested.
                       ticket:
                         type: string
                         description: The ticket corresponding to the request.
@@ -296,33 +345,24 @@ def transform():
         400:
           description: Client error.
     """
-    # Create tmp directory used for storage of uploaded
-    # (and created, in case of prompt response) files.
-    tempdir = getenv('TEMPDIR') or gettempdir()
-    tempdir = path.join(tempdir, 'gdal-transform')
-    mkdir(tempdir)
+    # Get session parameters
+    ticket = session['ticket']
+    working_path = session['temp_working_path']
+    src_path = path.join(working_path, 'src')
     # Get the http request parameters
     try:
         params = getTransformParams(request)
     except Exception as e:
         mainLogger.info('Client error: %s', str(e))
         return make_response({'Error': str(e)}, 400)
-
-    # Create a unique ticket for the request
-    ticket = md5(str(uuid4()).encode()).hexdigest()
-    # ticket = str(uuid4()).replace('-', '')
-
-    # The relative path for storing resulted files in the form /date/ticket/.
-    rel_path = datetime.now().strftime("%y%m%d")
+    # Add response type to session
+    session['response_type'] = params['response']
 
     # Form the source full path of the uploaded file
     if params['resource'] is not None:
         src_file = params['resource']
     elif request.files['resource'] is not None:
         resource = request.files['resource']
-
-        src_path = path.join(tempdir, 'src', ticket)
-        mkdir(src_path)
         src_file = path.join(src_path, secure_filename(resource.filename))
         resource.save(src_file)
     else:
@@ -330,13 +370,11 @@ def transform():
 
     # Create the response according to requested response type
     gdal_params = {'type': params['src_type'], 'srcCRS': params['from_crs'], 'tgtCRS': params['to_crs'], 'tgtFormat': params['format']}
-    tgt_path = path.join(tempdir, ticket)
-    mkdir(tgt_path)
     if params['response'] == 'prompt':
         filesize = stat(src_file).st_size
         start_time = datetime.now()
         try:
-            result = transformProcess(src_file, tgt_path, gdal_params)
+            result = transformProcess(src_file, working_path, ticket, gdal_params)
         except Exception as e:
             execution_time = round((datetime.now() - start_time).total_seconds(), 3)
             accountLogger(success=False, execution_start=start_time, execution_time=execution_time, comment=str(e), filesize=filesize)
@@ -344,18 +382,21 @@ def transform():
         execution_time = round((datetime.now() - start_time).total_seconds(), 3)
         accountLogger(success=True, execution_start=start_time, execution_time=execution_time, filesize=filesize)
         if params['resource'] is not None:
+            # The relative path for storing resulted files in the form /date/ticket/.
+            rel_path = datetime.now().strftime("%y%m%d")
             mkdir(path.join(getenv('OUTPUT_DIR'), rel_path))
             rel_path = path.join(rel_path, path.basename(result))
             move(result, path.join(getenv('OUTPUT_DIR'), rel_path))
-            return make_response({'filepath': rel_path}, 200)
+            return make_response({'filepath': rel_path, 'type': 'prompt'}, 200)
         else:
             return send_file(result, as_attachment=True)
     else:
-        enqueue.submit(ticket, src_file, tgt_path, gdal_params=gdal_params)
+        date = datetime.now().strftime("%y%m%d")
+        enqueue.submit(ticket, src_file, working_path, date=date, gdal_params=gdal_params)
         if params['resource'] is not None:
-            response = { "ticket": ticket, "filepath": path.join(rel_path, ticket + '.tar.gz') }
+            response = { "ticket": ticket, "filepath": path.join(date, ticket + '.tar.gz') }
         else:
-            response = { "ticket": ticket, "endpoint": "/resource/%s" % (ticket), "status": "/status/%s" % (ticket)}
+            response = { "type": "deferred", "ticket": ticket, "endpoint": "/resource/%s" % (ticket), "status": "/status/%s" % (ticket)}
         return make_response(response, 202)
 
 @app.route("/status/<ticket>")
@@ -396,7 +437,7 @@ def status(ticket):
                     type: string
                     format: datetime
                     description: The timestamp of the request.
-                  execution_time(s):
+                  executionTime:
                     type: integer
                     description: The execution time in seconds.
         404:
@@ -411,7 +452,7 @@ def status(ticket):
             success = bool(results['success'])
         else:
             success = None
-        return make_response({"completed": bool(results['status']), "success": success, "requested": results['requested_time'], "execution_time(s)": results['execution_time'], "comment": results['comment']}, 200)
+        return make_response({"completed": bool(results['status']), "success": success, "requested": results['requested_time'].isoformat(), "executionTime": results['execution_time'], "comment": results['comment']}, 200)
     return make_response('Not found.', 404)
 
 @app.route("/resource/<ticket>")
@@ -446,13 +487,14 @@ def resource(ticket):
     if ticket is None:
         return make_response('Resource ticket is missing.', 400)
     dbc = db.get_db()
-    rel_path = dbc.execute('SELECT result FROM tickets WHERE ticket = ?', [ticket]).fetchone()['result']
+    rel_path = dbc.execute('SELECT result FROM tickets WHERE ticket = ?', [ticket]).fetchone()
     if rel_path is None:
         return make_response('Not found.', 404)
-    file = path.join(getenv('OUTPUT_DIR'), rel_path)
+    file = path.join(getenv('OUTPUT_DIR'), rel_path['result'])
     if not path.isfile(file):
         return make_response('Resource does not exist.', 507)
-    return send_file(file, as_attachment=True)
+    file_content = open(file, 'rb')
+    return send_file(file_content, attachment_filename=path.basename(file), as_attachment=True, mimetype='application/tar+gzip')
 
 with app.test_request_context():
     spec.path(view=transform)

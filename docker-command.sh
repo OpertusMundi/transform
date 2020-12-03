@@ -26,6 +26,10 @@ if [ ! -f "${LOGGING_FILE_CONFIG}" ]; then
     exit 1
 fi
 
+if [ -n "${LOGGING_ROOT_LEVEL}" ]; then
+    sed -i -e "/^\[logger_root\]/,/^\[.*/ { s/^level=.*/level=${LOGGING_ROOT_LEVEL}/ }" ${LOGGING_FILE_CONFIG}    
+fi
+
 export FLASK_APP="transform"
 export DATABASE="./transform.sqlite"
 export SECRET_KEY="$(cat ${SECRET_KEY_FILE})"

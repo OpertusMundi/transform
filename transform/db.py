@@ -35,8 +35,11 @@ def init_db():
 @with_appcontext
 def init_db_command():
     """Clear the existing data and create new tables."""
-    init_db()
-    click.echo('Initialized the database.')
+    dbc = get_db()
+    table = dbc.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tickets';").fetchone()
+    if table is None:
+        init_db()
+        click.echo('Initialized the database.')
 
 def init_app(app):
     app.teardown_appcontext(close_db)
